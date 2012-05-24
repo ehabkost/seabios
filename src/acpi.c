@@ -311,11 +311,26 @@ build_madt(void)
                      + sizeof(struct madt_intsrcovr) * 16
                      + sizeof(struct madt_local_nmi));
 
-    struct multiple_apic_table *madt = malloc_high(madt_size);
+    struct fw_cfg_lapic_info_entry *lapics = NULL;
+    struct multiple_apic_table *madt = NULL;
+    u64 lapic_count = qemu_cfg_get_lapic_count();
+
+    if (lapic_count) {
+        lapics = malloc_tmphigh(sizeof(*lapics) * lapic_count);
+        if (!lapics) {
+            warn_noalloc();
+            goto out;
+        }
+    }
+
+    qemu_cfg_get_lapic_info(lapics, lapic_count);
+
+    madt = malloc_high(madt_size);
     if (!madt) {
         warn_noalloc();
-        return NULL;
+        goto out;
     }
+
     memset(madt, 0, madt_size);
     madt->local_apic_address = cpu_to_le32(BUILD_APIC_ADDR);
     madt->flags = cpu_to_le32(1);
@@ -325,7 +340,8 @@ build_madt(void)
         apic->type = APIC_PROCESSOR;
         apic->length = sizeof(*apic);
         apic->processor_id = i;
-        apic->local_apic_id = i;
+        if (i < lapic_count)
+            apic->local_apic_id = lapics[i].apic_id;
         if (i < CountCPUs)
             apic->flags = cpu_to_le32(1);
         else
@@ -335,7 +351,7 @@ build_madt(void)
     struct madt_io_apic *io_apic = (void*)apic;
     io_apic->type = APIC_IO;
     io_apic->length = sizeof(*io_apic);
-    io_apic->io_apic_id = CountCPUs;
+    io_apic->io_apic_id = 0;
     io_apic->address = cpu_to_le32(BUILD_IOAPIC_ADDR);
     io_apic->interrupt = cpu_to_le32(0);
 
@@ -371,6 +387,10 @@ build_madt(void)
     local_nmi++;
 
     build_header((void*)madt, APIC_SIGNATURE, (void*)local_nmi - (void*)madt, 1);
+
+out:
+    if (lapics)
+        free(lapics);
     return madt;
 }
 

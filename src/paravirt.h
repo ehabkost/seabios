@@ -40,6 +40,8 @@ static inline int kvm_para_available(void)
 #define QEMU_CFG_SMBIOS_ENTRIES         (QEMU_CFG_ARCH_LOCAL + 1)
 #define QEMU_CFG_IRQ0_OVERRIDE          (QEMU_CFG_ARCH_LOCAL + 2)
 #define QEMU_CFG_E820_TABLE             (QEMU_CFG_ARCH_LOCAL + 3)
+#define QEMU_CFG_LAPIC_INFO             (QEMU_CFG_ARCH_LOCAL + 5)
+
 
 extern int qemu_cfg_present;
 
@@ -57,6 +59,16 @@ int qemu_cfg_smbios_load_external(int type, char **p, unsigned *nr_structs,
 int qemu_cfg_get_numa_nodes(void);
 void qemu_cfg_get_numa_data(u64 *data, int n);
 u16 qemu_cfg_get_max_cpus(void);
+
+struct fw_cfg_lapic_info_entry {
+    u8 apic_id;
+    u8 reserved1;
+    u16 reserved2;
+    u32 reserved3;
+} PACKED;
+
+u64 qemu_cfg_get_lapic_count(void);
+void qemu_cfg_get_lapic_info(struct fw_cfg_lapic_info_entry *entries, u64 n);
 
 typedef struct QemuCfgFile {
     u32  size;        /* file size */
