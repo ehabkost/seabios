@@ -595,20 +595,35 @@ acpi_build_srat_memory(struct srat_memory_affinity *numamem,
 static void *
 build_srat(void)
 {
+    struct fw_cfg_lapic_info_entry *lapics = NULL;
+    u64 lapic_count = 0;
+    struct system_resource_affinity_table *srat = NULL;
+    u64 *numadata = NULL;
     int nb_numa_nodes = qemu_cfg_get_numa_nodes();
 
     if (nb_numa_nodes == 0)
-        return NULL;
+        goto out;
 
-    u64 *numadata = malloc_tmphigh(sizeof(u64) * (MaxCountCPUs + nb_numa_nodes));
+    numadata = malloc_tmphigh(sizeof(u64) * (MaxCountCPUs + nb_numa_nodes));
     if (!numadata) {
         warn_noalloc();
-        return NULL;
+        goto out;
     }
 
     qemu_cfg_get_numa_data(numadata, MaxCountCPUs + nb_numa_nodes);
 
-    struct system_resource_affinity_table *srat;
+    lapic_count = qemu_cfg_get_lapic_count();
+
+    if (lapic_count) {
+        lapics = malloc_tmphigh(sizeof(*lapics) * lapic_count);
+        if (!lapics) {
+            warn_noalloc();
+            goto out;
+        }
+    }
+
+    qemu_cfg_get_lapic_info(lapics, lapic_count);
+
     int srat_size = sizeof(*srat) +
         sizeof(struct srat_processor_affinity) * MaxCountCPUs +
         sizeof(struct srat_memory_affinity) * (nb_numa_nodes + 2);
@@ -629,7 +644,8 @@ build_srat(void)
     for (i = 0; i < MaxCountCPUs; ++i) {
         core->type = SRAT_PROCESSOR;
         core->length = sizeof(*core);
-        core->local_apic_id = i;
+        if (i < lapic_count)
+            core->local_apic_id = lapics[i].apic_id;
         curnode = *numadata++;
         core->proximity_lo = curnode;
         memset(core->proximity_hi, 0, 3);
@@ -683,7 +699,11 @@ build_srat(void)
 
     build_header((void*)srat, SRAT_SIGNATURE, srat_size, 1);
 
-    free(numadata);
+out:
+    if (lapics)
+        free(lapics);
+    if (numadata)
+        free(numadata);
     return srat;
 }
 
