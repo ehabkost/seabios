@@ -293,6 +293,18 @@ void qemu_cfg_get_numa_data(u64 *data, int n)
         qemu_cfg_read((u8*)(data + i), sizeof(u64));
 }
 
+u64 qemu_cfg_get_lapic_count(void)
+{
+    u64 cnt;
+    qemu_cfg_read_entry(&cnt, QEMU_CFG_LAPIC_INFO, sizeof(cnt));
+    return cnt;
+}
+
+void qemu_cfg_get_lapic_info(struct fw_cfg_lapic_info_entry *entries, u64 n)
+{
+    qemu_cfg_read((u8*)entries, sizeof(struct fw_cfg_lapic_info_entry)*n);
+}
+
 u16 qemu_cfg_get_max_cpus(void)
 {
     u16 cnt;
