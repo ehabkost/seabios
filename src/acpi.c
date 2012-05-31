@@ -336,12 +336,15 @@ build_madt(void)
     madt->flags = cpu_to_le32(1);
     struct madt_processor_apic *apic = (void*)&madt[1];
     int i;
+    int last_apic_id = 0;
     for (i=0; i<MaxCountCPUs; i++) {
         apic->type = APIC_PROCESSOR;
         apic->length = sizeof(*apic);
         apic->processor_id = i;
         if (i < lapic_count)
-            apic->local_apic_id = lapics[i].apic_id;
+            last_apic_id = apic->local_apic_id = lapics[i].apic_id;
+        else
+            apic->local_apic_id = ++last_apic_id;
         if (i < CountCPUs)
             apic->flags = cpu_to_le32(1);
         else
@@ -640,12 +643,15 @@ build_srat(void)
     struct srat_processor_affinity *core = (void*)(srat + 1);
     int i;
     u64 curnode;
+    int last_apic_id = 0;
 
     for (i = 0; i < MaxCountCPUs; ++i) {
         core->type = SRAT_PROCESSOR;
         core->length = sizeof(*core);
         if (i < lapic_count)
-            core->local_apic_id = lapics[i].apic_id;
+            last_apic_id = core->local_apic_id = lapics[i].apic_id;
+        else
+            core->local_apic_id = ++last_apic_id;
         curnode = *numadata++;
         core->proximity_lo = curnode;
         memset(core->proximity_hi, 0, 3);
